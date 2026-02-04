@@ -81,3 +81,8 @@
 - [x] 更新所有图标文件(icon.png, splash-icon.png, favicon.png, android-icon-foreground.png)
 - [x] 将日历组件改为中文显示
 - [x] 测试修改后的效果
+
+## 图标优化
+- [x] 重新设计图标(闹钟元素在前,日历元素在后)
+- [x] 更新所有图标文件
+- [x] 更新app.config.ts中的logoUrl
