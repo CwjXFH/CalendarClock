@@ -75,3 +75,9 @@
 - [x] 测试铃声播放
 - [x] 测试深色模式
 - [x] 性能优化
+
+## 用户反馈修改
+- [x] 重新设计应用图标(简洁扁平化,突出闹钟和日历元素)
+- [x] 更新所有图标文件(icon.png, splash-icon.png, favicon.png, android-icon-foreground.png)
+- [x] 将日历组件改为中文显示
+- [x] 测试修改后的效果

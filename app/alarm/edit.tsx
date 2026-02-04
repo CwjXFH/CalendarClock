@@ -15,6 +15,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
+import { format } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import { ScreenContainer } from '@/components/screen-container';
 import { useAlarms } from '@/lib/alarm-provider';
 import { useColors } from '@/hooks/use-colors';
@@ -209,7 +211,7 @@ export default function EditAlarmScreen() {
             >
               <View className="bg-surface border border-border rounded-xl px-4 py-3 flex-row items-center justify-between">
                 <Text className="text-base text-foreground">
-                  {date ? date.toLocaleDateString('zh-CN') : '不选择'}
+                  {date ? format(date, 'yyyy年MM月dd日 EEEE', { locale: zhCN }) : '不选择'}
                 </Text>
                 {date && (
                   <Pressable
