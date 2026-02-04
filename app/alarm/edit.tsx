@@ -232,6 +232,11 @@ export default function EditAlarmScreen() {
               display="spinner"
               onChange={handleDateChange}
               minimumDate={new Date()}
+              maximumDate={(() => {
+                const maxDate = new Date();
+                maxDate.setFullYear(maxDate.getFullYear() + 1);
+                return maxDate;
+              })()}
             />
           )}
 

@@ -47,6 +47,35 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // 检查并关闭已失效的闹钟
+  const checkExpiredAlarms = useCallback(async () => {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    let hasChanges = false;
+    const updatedAlarms = await Promise.all(
+      alarms.map(async (alarm) => {
+        // 如果闹钟开启且有指定日期
+        if (alarm.enabled && alarm.date && alarm.repeatType === 'none') {
+          // 检查是否已过期
+          if (alarm.date < today || (alarm.date === today && alarm.time < currentTime)) {
+            hasChanges = true;
+            // 自动关闭已失效的闹钟
+            await storage.updateAlarm(alarm.id, { enabled: false });
+            await notifications.cancelAlarmNotification(alarm.id);
+            return { ...alarm, enabled: false };
+          }
+        }
+        return alarm;
+      })
+    );
+    
+    if (hasChanges) {
+      setAlarms(updatedAlarms);
+    }
+  }, [alarms]);
+
   // 初始化加载
   useEffect(() => {
     const init = async () => {
@@ -58,6 +87,15 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     };
     init();
   }, [refreshAlarms, refreshSounds]);
+
+  // 定时检查已失效的闹钟(每分钟检查一次)
+  useEffect(() => {
+    if (alarms.length > 0) {
+      checkExpiredAlarms();
+      const interval = setInterval(checkExpiredAlarms, 60000); // 60秒
+      return () => clearInterval(interval);
+    }
+  }, [alarms, checkExpiredAlarms]);
 
   // 添加闹钟
   const addAlarm = useCallback(async (alarm: Omit<Alarm, 'id' | 'createdAt' | 'updatedAt'>) => {

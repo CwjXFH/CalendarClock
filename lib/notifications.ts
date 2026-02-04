@@ -74,7 +74,9 @@ export async function scheduleAlarmNotification(alarm: Alarm): Promise<string[]>
         content: {
           title: alarm.label || '闹钟',
           body: `${alarm.time}`,
-          sound: true,
+          sound: 'default', // 使用默认系统铃声
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          vibrate: [0, 250, 250, 250],
           data: { alarmId: alarm.id },
         },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate },
@@ -90,7 +92,9 @@ export async function scheduleAlarmNotification(alarm: Alarm): Promise<string[]>
           content: {
             title: alarm.label || '闹钟',
             body: `${alarm.time}`,
-            sound: true,
+            sound: 'default', // 使用默认系统铃声
+            priority: Notifications.AndroidNotificationPriority.MAX,
+            vibrate: [0, 250, 250, 250],
             data: { alarmId: alarm.id },
           },
           trigger: {
