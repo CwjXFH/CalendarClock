@@ -8,6 +8,7 @@ import "react-native-reanimated";
 import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
+import { AlarmProvider } from "@/lib/alarm-provider";
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext,
@@ -98,8 +99,9 @@ export default function RootLayout() {
   const shouldOverrideSafeArea = Platform.OS === "web";
 
   if (shouldOverrideSafeArea) {
-    return (
-      <ThemeProvider>
+  return (
+    <ThemeProvider>
+      <AlarmProvider>
         <SafeAreaProvider initialMetrics={providerInitialMetrics}>
           <SafeAreaFrameContext.Provider value={frame}>
             <SafeAreaInsetsContext.Provider value={insets}>
@@ -107,13 +109,16 @@ export default function RootLayout() {
             </SafeAreaInsetsContext.Provider>
           </SafeAreaFrameContext.Provider>
         </SafeAreaProvider>
-      </ThemeProvider>
-    );
+      </AlarmProvider>
+    </ThemeProvider>
+  );
   }
 
   return (
     <ThemeProvider>
-      <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>
+      <AlarmProvider>
+        <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>
+      </AlarmProvider>
     </ThemeProvider>
   );
 }

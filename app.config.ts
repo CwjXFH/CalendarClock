@@ -32,7 +32,7 @@ const env = {
   appSlug: "ios-alarm-app",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "",
+  logoUrl: "https://private-us-east-1.manuscdn.com/sessionFile/vSk8D2TvcZDBFxo6NoNTw6/sandbox/g0vtLvqjuIfe8CXHxTVmYE-img-1_1770185397000_na1fn_YWxhcm0taWNvbg.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvdlNrOEQyVHZjWkRCRnhvNk5vTlR3Ni9zYW5kYm94L2cwdnRMdnFqdUlmZThDWEh4VFZtWUUtaW1nLTFfMTc3MDE4NTM5NzAwMF9uYTFmbl9ZV3hoY20wdGFXTnZiZy5wbmc~eC1vc3MtcHJvY2Vzcz1pbWFnZS9yZXNpemUsd18xOTIwLGhfMTkyMC9mb3JtYXQsd2VicC9xdWFsaXR5LHFfODAiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTg3NjE2MDB9fX1dfQ__&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=bVhVbncNk1BTEFabml6dHhZfjI5am1FfnkxMmtGNWR4UmxEY29pNHlhMUxSS2xubVpvVmVoWjVKbVJMLWVRVjQtczBDRXExUkFvWGpNQUU5NkxUMUxKUnJNMEl3RjBrWXc3UzlaRERBVm5GdVZEaC1oWmxnU3NOcFFCa3YwOTNoLWlwbXFXWHNjTHRra2RlWHFpRXNObHltN3J2NS1wRU9TbmwyR0xFOXVVbHhydHBFS2xrSmlaajU4M1IxSHRPdDZVbkhMR0czbWNkOWgxTmNEbH4zVk5VTW13RTQ1dGpNRDVDemR6a0pocC02ZjVqYVJaRzJZeUU4b3pVcHl0Q0I3MUtacGkwUkJsVU1panV5a205MFVnbEJ-RWF-U01kNnlGbVg3TnN5NmxzNUVTa3dHemI2S09VTUNpY35OWHRacDU3MVFzS1dhMWlMNGhsbVVrM3dfXw__",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
