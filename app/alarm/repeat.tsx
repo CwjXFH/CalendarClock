@@ -53,9 +53,16 @@ export default function RepeatScreen() {
   };
 
   const handleSave = () => {
-    // 返回选择结果
-    router.back();
-    // TODO: 通过回调或状态管理传递结果
+    router.replace({
+      pathname: '/alarm/edit',
+      params: {
+        ...(params.id && { id: params.id as string }),
+        repeatType: repeatType,
+        repeatDays: JSON.stringify(selectedDays),
+        ...(params.soundId && { soundId: params.soundId as string }),
+        ...(params.soundName && { soundName: params.soundName as string }),
+      },
+    });
   };
 
   const handleCancel = () => {

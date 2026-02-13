@@ -6,6 +6,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import type { Alarm } from '@/types/alarm';
+import { getHolidayDates } from '@/constants/holidays';
 
 // 配置通知行为
 Notifications.setNotificationHandler({
@@ -35,6 +36,16 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   }
 
   return finalStatus === 'granted';
+}
+
+/**
+ * 获取通知铃声 - 仅自定义铃声(文件路径)有效，系统预设使用 default
+ */
+function getNotificationSound(soundId: string | undefined): string {
+  if (!soundId || soundId === 'default') return 'default';
+  // 自定义铃声有文件路径格式(含/或.)，expo-notifications 支持
+  if (soundId.includes('/') || soundId.includes('.')) return soundId;
+  return 'default';
 }
 
 /**
@@ -70,11 +81,12 @@ export async function scheduleAlarmNotification(alarm: Alarm): Promise<string[]>
         }
       }
 
+      const sound = getNotificationSound(alarm.soundId);
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title: alarm.label || '闹钟',
           body: `${alarm.time}`,
-          sound: 'default', // 使用默认系统铃声
+          sound,
           priority: Notifications.AndroidNotificationPriority.MAX,
           vibrate: [0, 250, 250, 250],
           data: { alarmId: alarm.id },
@@ -88,11 +100,12 @@ export async function scheduleAlarmNotification(alarm: Alarm): Promise<string[]>
     // 每周重复的闹钟
     else if (alarm.repeatType === 'weekly' && alarm.repeatDays && alarm.repeatDays.length > 0) {
       for (const weekday of alarm.repeatDays) {
+        const sound = getNotificationSound(alarm.soundId);
         const id = await Notifications.scheduleNotificationAsync({
           content: {
             title: alarm.label || '闹钟',
             body: `${alarm.time}`,
-            sound: 'default', // 使用默认系统铃声
+            sound,
             priority: Notifications.AndroidNotificationPriority.MAX,
             vibrate: [0, 250, 250, 250],
             data: { alarmId: alarm.id },
@@ -112,8 +125,30 @@ export async function scheduleAlarmNotification(alarm: Alarm): Promise<string[]>
 
     // 法定节假日闹钟
     else if (alarm.repeatType === 'holiday') {
-      // TODO: 实现法定节假日逻辑
-      console.log('Holiday notifications not yet implemented');
+      const now = new Date();
+      const startYear = now.getFullYear();
+      const endYear = now.getFullYear() + 1;
+      const holidayDates = getHolidayDates(startYear, endYear);
+
+      for (const dateStr of holidayDates) {
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const triggerDate = new Date(year, month - 1, day, hour, minute, 0, 0);
+        if (triggerDate > now) {
+          const sound = getNotificationSound(alarm.soundId);
+          const id = await Notifications.scheduleNotificationAsync({
+            content: {
+              title: alarm.label || '闹钟',
+              body: `${alarm.time}`,
+              sound,
+              priority: Notifications.AndroidNotificationPriority.MAX,
+              vibrate: [0, 250, 250, 250],
+              data: { alarmId: alarm.id },
+            },
+            trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate },
+          });
+          notificationIds.push(id);
+        }
+      }
     }
 
     // 保存通知ID到闹钟数据(用于后续取消)

@@ -49,8 +49,18 @@ export default function SoundScreen() {
   };
 
   const handleSave = () => {
-    router.back();
-    // TODO: 通过回调或状态管理传递结果
+    const selectedSound = [...systemSounds, ...customSounds].find(s => s.id === selectedSoundId);
+    const soundName = selectedSound?.name ?? '默认铃声';
+    router.replace({
+      pathname: '/alarm/edit',
+      params: {
+        ...(params.id && { id: params.id as string }),
+        soundId: selectedSoundId,
+        soundName,
+        ...(params.repeatType && { repeatType: params.repeatType as string }),
+        ...(params.repeatDays && { repeatDays: params.repeatDays as string }),
+      },
+    });
   };
 
   const handleCancel = () => {
@@ -123,7 +133,7 @@ export default function SoundScreen() {
                 还没有自定义铃声
               </Text>
               <Text className="text-sm text-muted text-center mt-2">
-                点击右上角"添加"按钮上传
+                点击右上角「添加」按钮上传
               </Text>
             </View>
           ) : (
