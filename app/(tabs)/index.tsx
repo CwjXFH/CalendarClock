@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { View, Text, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
-import { AlarmCard } from '@/components/alarm-card';
+import { SwipeableAlarmCard } from '@/components/swipeable-alarm-card';
 import { AddButton } from '@/components/add-button';
 import { useAlarms } from '@/lib/alarm-provider';
 import { useColors } from '@/hooks/use-colors';
@@ -17,7 +17,7 @@ const MAX_ALARMS = 30;
 export default function HomeScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { alarms, loading, toggleAlarm, deleteAlarm } = useAlarms();
+  const { alarms, loading, toggleAlarm, deleteAlarm, refreshAlarms } = useAlarms();
   const [refreshing, setRefreshing] = useState(false);
 
   const handleAddAlarm = () => {
@@ -62,8 +62,8 @@ export default function HomeScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    // 刷新操作(已通过Context自动同步)
-    setTimeout(() => setRefreshing(false), 500);
+    await refreshAlarms();
+    setRefreshing(false);
   };
 
   if (loading) {
@@ -101,10 +101,12 @@ export default function HomeScreen() {
           data={alarms}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <AlarmCard
+            <SwipeableAlarmCard
               alarm={item}
               onPress={() => handleEditAlarm(item)}
               onToggle={(enabled) => handleToggleAlarm(item.id, enabled)}
+              onEdit={() => handleEditAlarm(item)}
+              onDelete={() => handleDeleteAlarm(item.id)}
             />
           )}
           contentContainerStyle={{

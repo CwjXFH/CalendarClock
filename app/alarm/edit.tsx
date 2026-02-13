@@ -72,6 +72,26 @@ export default function EditAlarmScreen() {
     }
   }, [existingAlarm]);
 
+  // 从子页面(重复规则/铃声选择)返回时同步参数到表单
+  useEffect(() => {
+    if (params.repeatType) {
+      setRepeatType(params.repeatType as Alarm['repeatType']);
+    }
+    if (params.repeatDays) {
+      try {
+        setRepeatDays(JSON.parse(params.repeatDays as string));
+      } catch {
+        // ignore
+      }
+    }
+    if (params.soundId) {
+      setSoundId(params.soundId as string);
+    }
+    if (params.soundName) {
+      setSoundName(params.soundName as string);
+    }
+  }, [params.repeatType, params.repeatDays, params.soundId, params.soundName]);
+
   const handleSave = async () => {
     const timeStr = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
     const dateStr = date ? date.toISOString().split('T')[0] : undefined;
@@ -83,6 +103,7 @@ export default function EditAlarmScreen() {
       enabled: true,
       repeatType,
       repeatDays: repeatType === 'weekly' ? repeatDays : undefined,
+      holidayType: repeatType === 'holiday' ? 'all' : undefined,
       soundId,
       soundName,
     };
@@ -250,6 +271,9 @@ export default function EditAlarmScreen() {
                   params: {
                     type: repeatType,
                     days: JSON.stringify(repeatDays),
+                    ...(alarmId && { id: alarmId }),
+                    soundId,
+                    soundName,
                   },
                 });
               }}
@@ -273,7 +297,12 @@ export default function EditAlarmScreen() {
               onPress={() => {
                 router.push({
                   pathname: '/alarm/sound',
-                  params: { soundId },
+                  params: {
+                    soundId,
+                    ...(alarmId && { id: alarmId }),
+                    repeatType,
+                    repeatDays: JSON.stringify(repeatDays),
+                  },
                 });
               }}
               style={({ pressed }) => ({
