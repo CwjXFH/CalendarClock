@@ -2,7 +2,7 @@
  * 铃声选择页面
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,14 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
-import { getSystemSounds, getCustomSounds } from '@/lib/storage';
+import { getSystemSounds, getCustomSounds, getPreviewAudioSource } from '@/lib/storage';
 import type { Sound } from '@/types/alarm';
 import { cn } from '@/lib/utils';
+
+const PREVIEW_DURATION_MS = 3000;
 
 export default function SoundScreen() {
   const router = useRouter();
@@ -30,6 +33,14 @@ export default function SoundScreen() {
   const [systemSounds, setSystemSounds] = useState<Sound[]>([]);
   const [customSounds, setCustomSounds] = useState<Sound[]>([]);
 
+  const previewStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const player = useAudioPlayer(getPreviewAudioSource(getSystemSounds()[0] ?? { id: 'default', name: '默认铃声', uri: 'system://default', isCustom: false }));
+
+  useEffect(() => {
+    setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'mixWithOthers', interruptionModeAndroid: 'duckOthers' });
+  }, []);
+
   useEffect(() => {
     loadSounds();
   }, []);
@@ -40,12 +51,38 @@ export default function SoundScreen() {
     setCustomSounds(custom);
   };
 
+  useEffect(() => {
+    return () => {
+      if (previewStopTimerRef.current) {
+        clearTimeout(previewStopTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleSelectSound = (sound: Sound) => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     setSelectedSoundId(sound.id);
-    // TODO: 播放铃声预览
+
+    if (previewStopTimerRef.current) {
+      clearTimeout(previewStopTimerRef.current);
+      previewStopTimerRef.current = null;
+    }
+
+    player.pause();
+    try {
+      const source = getPreviewAudioSource(sound);
+      player.replace(source);
+      player.play();
+
+      previewStopTimerRef.current = setTimeout(() => {
+        player.pause();
+        previewStopTimerRef.current = null;
+      }, PREVIEW_DURATION_MS);
+    } catch {
+      // 预览播放失败时静默忽略
+    }
   };
 
   const handleSave = () => {

@@ -106,6 +106,9 @@ export async function toggleAlarm(id: string): Promise<Alarm | null> {
   return updateAlarm(id, { enabled: !alarm.enabled });
 }
 
+/** 预览用铃声资源 - 系统预设共用同一预览音 */
+export const PREVIEW_SOUND_ASSET = require('../assets/sounds/default.mp3');
+
 /**
  * 获取系统预设铃声列表
  */
@@ -118,6 +121,16 @@ export function getSystemSounds(): Sound[] {
     { id: 'melody', name: '旋律铃声', uri: 'system://melody', isCustom: false },
     { id: 'chime', name: '钟声铃声', uri: 'system://chime', isCustom: false },
   ];
+}
+
+/**
+ * 获取可播放的预览音源 - 系统预设用打包资源，自定义用 uri
+ */
+export function getPreviewAudioSource(sound: Sound): number | string {
+  if (sound.isCustom && (sound.uri.includes('/') || sound.uri.includes('.'))) {
+    return sound.uri;
+  }
+  return PREVIEW_SOUND_ASSET;
 }
 
 /**
