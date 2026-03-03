@@ -2,7 +2,7 @@
  * 铃声选择页面
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,8 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { ScreenContainer } from '@/components/screen-container';
-import { useColors } from '@/hooks/use-colors';
 import { getSystemSounds, getCustomSounds, getPreviewAudioSource } from '@/lib/storage';
 import type { Sound } from '@/types/alarm';
 import { cn } from '@/lib/utils';
@@ -25,7 +24,6 @@ const PREVIEW_DURATION_MS = 3000;
 export default function SoundScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const colors = useColors();
 
   const currentSoundId = (params.soundId as string) || 'default';
 
@@ -34,11 +32,29 @@ export default function SoundScreen() {
   const [customSounds, setCustomSounds] = useState<Sound[]>([]);
 
   const previewStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewPlayerRef = useRef<AudioPlayer | null>(null);
 
-  const player = useAudioPlayer(getPreviewAudioSource(getSystemSounds()[0] ?? { id: 'default', name: '默认铃声', uri: 'system://default', isCustom: false }));
+  const stopPreviewPlayback = useCallback(() => {
+    if (previewStopTimerRef.current) {
+      clearTimeout(previewStopTimerRef.current);
+      previewStopTimerRef.current = null;
+    }
+
+    if (previewPlayerRef.current) {
+      previewPlayerRef.current.pause();
+      previewPlayerRef.current.remove();
+      previewPlayerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
-    setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'mixWithOthers', interruptionModeAndroid: 'duckOthers' });
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      interruptionMode: 'mixWithOthers',
+      interruptionModeAndroid: 'duckOthers',
+    }).catch((error) => {
+      console.error('Failed to configure audio mode for preview:', error);
+    });
   }, []);
 
   useEffect(() => {
@@ -52,12 +68,8 @@ export default function SoundScreen() {
   };
 
   useEffect(() => {
-    return () => {
-      if (previewStopTimerRef.current) {
-        clearTimeout(previewStopTimerRef.current);
-      }
-    };
-  }, []);
+    return () => stopPreviewPlayback();
+  }, [stopPreviewPlayback]);
 
   const handleSelectSound = (sound: Sound) => {
     if (Platform.OS !== 'web') {
@@ -65,27 +77,25 @@ export default function SoundScreen() {
     }
     setSelectedSoundId(sound.id);
 
-    if (previewStopTimerRef.current) {
-      clearTimeout(previewStopTimerRef.current);
-      previewStopTimerRef.current = null;
-    }
+    stopPreviewPlayback();
 
-    player.pause();
     try {
       const source = getPreviewAudioSource(sound);
-      player.replace(source);
+      const player = createAudioPlayer(source);
+      player.loop = true;
       player.play();
+      previewPlayerRef.current = player;
 
       previewStopTimerRef.current = setTimeout(() => {
-        player.pause();
-        previewStopTimerRef.current = null;
+        stopPreviewPlayback();
       }, PREVIEW_DURATION_MS);
-    } catch {
-      // 预览播放失败时静默忽略
+    } catch (error) {
+      console.error('Failed to preview sound:', error);
     }
   };
 
   const handleSave = () => {
+    stopPreviewPlayback();
     const selectedSound = [...systemSounds, ...customSounds].find(s => s.id === selectedSoundId);
     const soundName = selectedSound?.name ?? '默认铃声';
     router.replace({
@@ -101,6 +111,7 @@ export default function SoundScreen() {
   };
 
   const handleCancel = () => {
+    stopPreviewPlayback();
     router.back();
   };
 
