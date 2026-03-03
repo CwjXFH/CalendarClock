@@ -8,6 +8,8 @@ import { Platform } from 'react-native';
 import type { Alarm } from '@/types/alarm';
 import { getHolidayDates } from '@/constants/holidays';
 
+const DEFAULT_ALARM_SOUND_FILENAME = 'default.mp3';
+
 // 配置通知行为
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -39,13 +41,42 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /**
- * 获取通知铃声 - 仅自定义铃声(文件路径)有效，系统预设使用 default
+ * 获取通知铃声文件名
+ * - 系统铃声统一使用打包闹铃音
+ * - 若是自定义路径，尽量提取文件名
  */
 function getNotificationSound(soundId: string | undefined): string {
-  if (!soundId || soundId === 'default') return 'default';
-  // 自定义铃声有文件路径格式(含/或.)，expo-notifications 支持
-  if (soundId.includes('/') || soundId.includes('.')) return soundId;
-  return 'default';
+  if (!soundId || soundId === 'default') return DEFAULT_ALARM_SOUND_FILENAME;
+
+  if (soundId.includes('/') || soundId.includes('.')) {
+    const fileName = soundId.split('/').pop();
+    if (fileName && fileName.includes('.')) {
+      return fileName;
+    }
+  }
+
+  // 当前系统预设暂时共用同一个内置铃声文件
+  return DEFAULT_ALARM_SOUND_FILENAME;
+}
+
+/**
+ * Android 需要先为声音创建通知渠道，否则可能退回系统默认提示音
+ */
+async function ensureAndroidAlarmChannel(sound: string): Promise<string | undefined> {
+  if (Platform.OS !== 'android') {
+    return undefined;
+  }
+
+  const channelId = `alarm-${sound.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()}`;
+  await Notifications.setNotificationChannelAsync(channelId, {
+    name: '闹钟提醒',
+    importance: Notifications.AndroidImportance.MAX,
+    sound,
+    vibrationPattern: [0, 250, 250, 250],
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    bypassDnd: true,
+  });
+  return channelId;
 }
 
 /**
@@ -64,6 +95,17 @@ export async function scheduleAlarmNotification(alarm: Alarm): Promise<string[]>
 
   try {
     const [hour, minute] = alarm.time.split(':').map(Number);
+    const sound = getNotificationSound(alarm.soundId);
+    const channelId = await ensureAndroidAlarmChannel(sound);
+
+    const content: Notifications.NotificationContentInput = {
+      title: alarm.label || '闹钟',
+      body: `${alarm.time}`,
+      sound,
+      priority: Notifications.AndroidNotificationPriority.MAX,
+      vibrate: [0, 250, 250, 250],
+      data: { alarmId: alarm.id },
+    };
 
     // 不重复的闹钟
     if (alarm.repeatType === 'none') {
@@ -81,17 +123,13 @@ export async function scheduleAlarmNotification(alarm: Alarm): Promise<string[]>
         }
       }
 
-      const sound = getNotificationSound(alarm.soundId);
       const id = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: alarm.label || '闹钟',
-          body: `${alarm.time}`,
-          sound,
-          priority: Notifications.AndroidNotificationPriority.MAX,
-          vibrate: [0, 250, 250, 250],
-          data: { alarmId: alarm.id },
+        content,
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: triggerDate,
+          ...(channelId ? { channelId } : {}),
         },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate },
       });
 
       notificationIds.push(id);
@@ -100,22 +138,15 @@ export async function scheduleAlarmNotification(alarm: Alarm): Promise<string[]>
     // 每周重复的闹钟
     else if (alarm.repeatType === 'weekly' && alarm.repeatDays && alarm.repeatDays.length > 0) {
       for (const weekday of alarm.repeatDays) {
-        const sound = getNotificationSound(alarm.soundId);
         const id = await Notifications.scheduleNotificationAsync({
-          content: {
-            title: alarm.label || '闹钟',
-            body: `${alarm.time}`,
-            sound,
-            priority: Notifications.AndroidNotificationPriority.MAX,
-            vibrate: [0, 250, 250, 250],
-            data: { alarmId: alarm.id },
-          },
+          content,
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
             hour,
             minute,
             weekday: weekday + 1, // expo-notifications uses 1-7 (Sunday=1)
             repeats: true,
+            ...(channelId ? { channelId } : {}),
           },
         });
 
@@ -134,17 +165,13 @@ export async function scheduleAlarmNotification(alarm: Alarm): Promise<string[]>
         const [year, month, day] = dateStr.split('-').map(Number);
         const triggerDate = new Date(year, month - 1, day, hour, minute, 0, 0);
         if (triggerDate > now) {
-          const sound = getNotificationSound(alarm.soundId);
           const id = await Notifications.scheduleNotificationAsync({
-            content: {
-              title: alarm.label || '闹钟',
-              body: `${alarm.time}`,
-              sound,
-              priority: Notifications.AndroidNotificationPriority.MAX,
-              vibrate: [0, 250, 250, 250],
-              data: { alarmId: alarm.id },
+            content,
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: triggerDate,
+              ...(channelId ? { channelId } : {}),
             },
-            trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate },
           });
           notificationIds.push(id);
         }
