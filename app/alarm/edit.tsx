@@ -40,7 +40,7 @@ export default function EditAlarmScreen() {
   const [repeatType, setRepeatType] = useState<Alarm['repeatType']>('none');
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [soundId, setSoundId] = useState('default');
-  const [soundName, setSoundName] = useState('默认铃声');
+  const [soundName, setSoundName] = useState('系统默认铃声');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 

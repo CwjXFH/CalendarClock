@@ -111,6 +111,6 @@ export function createDefaultAlarm(): Omit<Alarm, 'id' | 'createdAt' | 'updatedA
     enabled: true,
     repeatType: 'none',
     soundId: 'default',
-    soundName: '默认铃声',
+    soundName: '系统默认铃声',
   };
 }

@@ -3,13 +3,11 @@
  * 提供全局闹钟状态管理
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Alarm, Sound } from '@/types/alarm';
-import { Platform } from 'react-native';
 import * as storage from '@/lib/storage';
 import * as notifications from '@/lib/notifications';
 import * as Notifications from 'expo-notifications';
-import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 
 interface AlarmContextValue {
   alarms: Alarm[];
@@ -24,16 +22,11 @@ interface AlarmContextValue {
 }
 
 const AlarmContext = createContext<AlarmContextValue | undefined>(undefined);
-const MAX_ALARM_PLAYBACK_MS = 60 * 1000;
 
 export function AlarmProvider({ children }: { children: React.ReactNode }) {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [sounds, setSounds] = useState<Sound[]>([]);
   const [loading, setLoading] = useState(true);
-  const alarmPlayerRef = useRef<AudioPlayer | null>(null);
-  const alarmStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const alarmsRef = useRef<Alarm[]>([]);
-  const soundsRef = useRef<Sound[]>([]);
 
   // 加载闹钟数据
   const refreshAlarms = useCallback(async () => {
@@ -55,69 +48,13 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // 监听通知响应
   useEffect(() => {
-    alarmsRef.current = alarms;
-  }, [alarms]);
-
-  useEffect(() => {
-    soundsRef.current = sounds;
-  }, [sounds]);
-
-  const stopActiveAlarmPlayback = useCallback(() => {
-    if (alarmStopTimerRef.current) {
-      clearTimeout(alarmStopTimerRef.current);
-      alarmStopTimerRef.current = null;
-    }
-
-    if (alarmPlayerRef.current) {
-      alarmPlayerRef.current.pause();
-      alarmPlayerRef.current.remove();
-      alarmPlayerRef.current = null;
-    }
-  }, []);
-
-  const playAlarmRingtone = useCallback(async (alarmId?: string) => {
-    if (Platform.OS === 'web') return;
-
-    stopActiveAlarmPlayback();
-
-    const systemSounds = storage.getSystemSounds();
-    const alarm = alarmId ? alarmsRef.current.find(item => item.id === alarmId) : undefined;
-    const selectedSound =
-      (alarm ? soundsRef.current.find(item => item.id === alarm.soundId) : undefined) ||
-      (alarm ? systemSounds.find(item => item.id === alarm.soundId) : undefined) ||
-      systemSounds[0];
-
-    if (!selectedSound) return;
-
-    try {
-      const player = createAudioPlayer(storage.getPreviewAudioSource(selectedSound));
-      player.loop = true;
-      player.play();
-      alarmPlayerRef.current = player;
-
-      alarmStopTimerRef.current = setTimeout(() => {
-        stopActiveAlarmPlayback();
-      }, MAX_ALARM_PLAYBACK_MS);
-    } catch (error) {
-      console.error('Failed to play alarm ringtone:', error);
-    }
-  }, [stopActiveAlarmPlayback]);
-
-  // 监听通知触发与交互，在应用活跃时补充循环闹铃播放
-  useEffect(() => {
-    const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
-      const alarmId = notification.request.content.data?.alarmId as string | undefined;
-      void playAlarmRingtone(alarmId);
-    });
-
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
-      const alarmId = response.notification.request.content.data?.alarmId as string | undefined;
-      void playAlarmRingtone(alarmId);
-
+    const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
+      const alarmId = response.notification.request.content.data?.alarmId as string;
       if (alarmId) {
         // 查找对应的闹钟
-        const alarm = alarmsRef.current.find(a => a.id === alarmId);
+        const alarm = alarms.find(a => a.id === alarmId);
         if (alarm && alarm.repeatType === 'none') {
           // 单次闹钟，自动关闭
           await storage.updateAlarm(alarmId, { enabled: false });
@@ -126,12 +63,8 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => {
-      receivedSubscription.remove();
-      responseSubscription.remove();
-      stopActiveAlarmPlayback();
-    };
-  }, [playAlarmRingtone, refreshAlarms, stopActiveAlarmPlayback]);
+    return () => subscription.remove();
+  }, [alarms, refreshAlarms]);
 
   // 初始化加载
   useEffect(() => {
@@ -139,14 +72,6 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       // 请求通知权限
       await notifications.requestNotificationPermissions();
-      if (Platform.OS !== 'web') {
-        await setAudioModeAsync({
-          playsInSilentMode: true,
-          interruptionMode: 'doNotMix',
-          interruptionModeAndroid: 'duckOthers',
-          shouldPlayInBackground: true,
-        });
-      }
       await Promise.all([refreshAlarms(), refreshSounds()]);
       setLoading(false);
     };

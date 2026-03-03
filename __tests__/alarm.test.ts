@@ -16,7 +16,7 @@ describe('Alarm Utils', () => {
         enabled: true,
         repeatType: 'none',
         soundId: 'default',
-        soundName: '默认铃声',
+        soundName: '系统默认铃声',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -32,7 +32,7 @@ describe('Alarm Utils', () => {
         enabled: true,
         repeatType: 'none',
         soundId: 'default',
-        soundName: '默认铃声',
+        soundName: '系统默认铃声',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -48,7 +48,7 @@ describe('Alarm Utils', () => {
         repeatType: 'weekly',
         repeatDays: [0, 1, 2, 3, 4, 5, 6],
         soundId: 'default',
-        soundName: '默认铃声',
+        soundName: '系统默认铃声',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -64,7 +64,7 @@ describe('Alarm Utils', () => {
         repeatType: 'weekly',
         repeatDays: [1, 2, 3, 4, 5],
         soundId: 'default',
-        soundName: '默认铃声',
+        soundName: '系统默认铃声',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -80,7 +80,7 @@ describe('Alarm Utils', () => {
         repeatType: 'weekly',
         repeatDays: [0, 6],
         soundId: 'default',
-        soundName: '默认铃声',
+        soundName: '系统默认铃声',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -96,7 +96,7 @@ describe('Alarm Utils', () => {
         repeatType: 'weekly',
         repeatDays: [1, 3, 5],
         soundId: 'default',
-        soundName: '默认铃声',
+        soundName: '系统默认铃声',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -112,7 +112,7 @@ describe('Alarm Utils', () => {
         repeatType: 'holiday',
         holidayType: 'all',
         soundId: 'default',
-        soundName: '默认铃声',
+        soundName: '系统默认铃声',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -148,7 +148,7 @@ describe('Alarm Utils', () => {
       expect(alarm.enabled).toBe(true);
       expect(alarm.repeatType).toBe('none');
       expect(alarm.soundId).toBe('default');
-      expect(alarm.soundName).toBe('默认铃声');
+      expect(alarm.soundName).toBe('系统默认铃声');
     });
 
     it('should have valid time format', () => {
