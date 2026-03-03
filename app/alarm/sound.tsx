@@ -15,7 +15,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { ScreenContainer } from '@/components/screen-container';
-import { getSystemSounds, getCustomSounds, getPreviewAudioSource } from '@/lib/storage';
+import { getSystemSounds, getCustomSounds, getPreviewAudioSource, isSystemSoundId } from '@/lib/storage';
 import type { Sound } from '@/types/alarm';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +33,7 @@ export default function SoundScreen() {
 
   const previewStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewPlayerRef = useRef<AudioPlayer | null>(null);
+  const systemPreviewTipShownRef = useRef(false);
 
   const stopPreviewPlayback = useCallback(() => {
     if (previewStopTimerRef.current) {
@@ -58,14 +59,17 @@ export default function SoundScreen() {
   }, []);
 
   useEffect(() => {
-    loadSounds();
-  }, []);
-
-  const loadSounds = async () => {
-    setSystemSounds(getSystemSounds());
-    const custom = await getCustomSounds();
-    setCustomSounds(custom);
-  };
+    const loadSounds = async () => {
+      const system = getSystemSounds();
+      setSystemSounds(system);
+      const custom = await getCustomSounds();
+      setCustomSounds(custom);
+      if (isSystemSoundId(currentSoundId) && currentSoundId !== 'default') {
+        setSelectedSoundId('default');
+      }
+    };
+    void loadSounds();
+  }, [currentSoundId]);
 
   useEffect(() => {
     return () => stopPreviewPlayback();
@@ -78,6 +82,14 @@ export default function SoundScreen() {
     setSelectedSoundId(sound.id);
 
     stopPreviewPlayback();
+
+    if (isSystemSoundId(sound.id)) {
+      if (!systemPreviewTipShownRef.current) {
+        Alert.alert('提示', '系统铃声由设备控制，应用内无法精确预览，实际播放以系统设置为准。');
+        systemPreviewTipShownRef.current = true;
+      }
+      return;
+    }
 
     try {
       const source = getPreviewAudioSource(sound);
@@ -96,13 +108,20 @@ export default function SoundScreen() {
 
   const handleSave = () => {
     stopPreviewPlayback();
-    const selectedSound = [...systemSounds, ...customSounds].find(s => s.id === selectedSoundId);
-    const soundName = selectedSound?.name ?? '默认铃声';
+    const allSounds = [...systemSounds, ...customSounds];
+    const fallbackSystemSound: Sound = systemSounds[0] ?? {
+      id: 'default',
+      name: '系统默认铃声',
+      uri: 'system://default',
+      isCustom: false,
+    };
+    const selectedSound = allSounds.find(s => s.id === selectedSoundId) ?? fallbackSystemSound;
+    const soundName = selectedSound.name;
     router.replace({
       pathname: '/alarm/edit',
       params: {
         ...(params.id && { id: params.id as string }),
-        soundId: selectedSoundId,
+        soundId: selectedSound.id,
         soundName,
         ...(params.repeatType && { repeatType: params.repeatType as string }),
         ...(params.repeatDays && { repeatDays: params.repeatDays as string }),

@@ -8,8 +8,6 @@ import { Platform } from 'react-native';
 import type { Alarm } from '@/types/alarm';
 import { getHolidayDates } from '@/constants/holidays';
 
-const DEFAULT_ALARM_SOUND_FILENAME = 'default.mp3';
-
 // 配置通知行为
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -41,12 +39,11 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /**
- * 获取通知铃声文件名
- * - 系统铃声统一使用打包闹铃音
- * - 若是自定义路径，尽量提取文件名
+ * 获取通知铃声配置
+ * 系统铃声统一跟随设备默认提醒音
  */
 function getNotificationSound(soundId: string | undefined): string {
-  if (!soundId || soundId === 'default') return DEFAULT_ALARM_SOUND_FILENAME;
+  if (!soundId || soundId === 'default') return 'default';
 
   if (soundId.includes('/') || soundId.includes('.')) {
     const fileName = soundId.split('/').pop();
@@ -55,23 +52,22 @@ function getNotificationSound(soundId: string | undefined): string {
     }
   }
 
-  // 当前系统预设暂时共用同一个内置铃声文件
-  return DEFAULT_ALARM_SOUND_FILENAME;
+  // 旧版本里的系统预设ID（classic/gentle等）统一映射到系统默认提醒音
+  return 'default';
 }
 
 /**
- * Android 需要先为声音创建通知渠道，否则可能退回系统默认提示音
+ * Android 需要创建通知渠道以确保高优先级提醒
  */
-async function ensureAndroidAlarmChannel(sound: string): Promise<string | undefined> {
+async function ensureAndroidAlarmChannel(): Promise<string | undefined> {
   if (Platform.OS !== 'android') {
     return undefined;
   }
 
-  const channelId = `alarm-${sound.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()}`;
+  const channelId = 'alarm-default-channel';
   await Notifications.setNotificationChannelAsync(channelId, {
     name: '闹钟提醒',
     importance: Notifications.AndroidImportance.MAX,
-    sound,
     vibrationPattern: [0, 250, 250, 250],
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     bypassDnd: true,
@@ -96,7 +92,7 @@ export async function scheduleAlarmNotification(alarm: Alarm): Promise<string[]>
   try {
     const [hour, minute] = alarm.time.split(':').map(Number);
     const sound = getNotificationSound(alarm.soundId);
-    const channelId = await ensureAndroidAlarmChannel(sound);
+    const channelId = await ensureAndroidAlarmChannel();
 
     const content: Notifications.NotificationContentInput = {
       title: alarm.label || '闹钟',

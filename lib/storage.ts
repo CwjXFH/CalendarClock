@@ -106,7 +106,7 @@ export async function toggleAlarm(id: string): Promise<Alarm | null> {
   return updateAlarm(id, { enabled: !alarm.enabled });
 }
 
-/** 预览用铃声资源 - 系统预设共用同一预览音 */
+/** 预览用铃声资源 - 仅用于自定义铃声预览兜底 */
 export const PREVIEW_SOUND_ASSET = require('../assets/sounds/default.mp3');
 
 /**
@@ -114,13 +114,17 @@ export const PREVIEW_SOUND_ASSET = require('../assets/sounds/default.mp3');
  */
 export function getSystemSounds(): Sound[] {
   return [
-    { id: 'default', name: '默认铃声', uri: 'system://default', isCustom: false },
-    { id: 'classic', name: '经典铃声', uri: 'system://classic', isCustom: false },
-    { id: 'gentle', name: '轻柔铃声', uri: 'system://gentle', isCustom: false },
-    { id: 'urgent', name: '急促铃声', uri: 'system://urgent', isCustom: false },
-    { id: 'melody', name: '旋律铃声', uri: 'system://melody', isCustom: false },
-    { id: 'chime', name: '钟声铃声', uri: 'system://chime', isCustom: false },
+    { id: 'default', name: '系统默认铃声', uri: 'system://default', isCustom: false },
   ];
+}
+
+/**
+ * 判断是否为系统铃声（包含旧版本遗留的系统预设ID）
+ */
+export function isSystemSoundId(soundId: string | undefined): boolean {
+  if (!soundId) return true;
+  const legacySystemIds = new Set(['default', 'classic', 'gentle', 'urgent', 'melody', 'chime']);
+  return legacySystemIds.has(soundId);
 }
 
 /**
