@@ -19,7 +19,7 @@ import { getSystemSounds, getCustomSounds, getPreviewAudioSource, isSystemSoundI
 import type { Sound } from '@/types/alarm';
 import { cn } from '@/lib/utils';
 
-const PREVIEW_DURATION_MS = 3000;
+const PREVIEW_DURATION_MS = 10000;
 
 export default function SoundScreen() {
   const router = useRouter();
@@ -83,15 +83,12 @@ export default function SoundScreen() {
 
     stopPreviewPlayback();
 
-    if (isSystemSoundId(sound.id)) {
-      if (!systemPreviewTipShownRef.current) {
-        Alert.alert('提示', '系统铃声由设备控制，应用内无法精确预览，实际播放以系统设置为准。');
+    try {
+      if (isSystemSoundId(sound.id) && !systemPreviewTipShownRef.current) {
+        Alert.alert('提示', '系统铃声由设备控制，下面播放的是参考示例，实际提醒以系统设置为准。');
         systemPreviewTipShownRef.current = true;
       }
-      return;
-    }
 
-    try {
       const source = getPreviewAudioSource(sound);
       const player = createAudioPlayer(source);
       player.loop = true;
