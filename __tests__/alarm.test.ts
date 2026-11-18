@@ -1,163 +1,72 @@
-/**
- * 闹钟功能单元测试
- */
+import { describe, it, expect } from 'vitest';
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import type { Alarm } from '../types/alarm';
-import { getRepeatDescription, formatTime, createDefaultAlarm } from '../types/alarm';
+import { createDefaultAlarm, describePeriod, describeRule, nextDateForTime, parseRule } from '../types/alarm';
 
-describe('Alarm Utils', () => {
-  describe('getRepeatDescription', () => {
-    it('should return "仅一次" for non-repeating alarm without date', () => {
-      const alarm: Alarm = {
-        id: '1',
-        time: '08:00',
-        label: 'Test',
-        enabled: true,
-        repeatType: 'none',
-        soundId: 'default',
-        soundName: '系统默认铃声',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      expect(getRepeatDescription(alarm)).toBe('仅一次');
-    });
+describe('describeRule', () => {
+  const today = '2026-11-18';
+  it('once 同年省略年份，跨年显示年份', () => {
+    expect(describeRule({ kind: 'once', date: '2026-12-01' }, today)).toBe('12月1日');
+    expect(describeRule({ kind: 'once', date: '2027-03-05' }, today)).toBe('2027年3月5日');
+  });
+  it('weekly 常用组合', () => {
+    expect(describeRule({ kind: 'weekly', days: [0, 1, 2, 3, 4, 5, 6] })).toBe('每天');
+    expect(describeRule({ kind: 'weekly', days: [1, 2, 3, 4, 5] })).toBe('每周一至周五');
+    expect(describeRule({ kind: 'weekly', days: [6, 0] })).toBe('每周末');
+    expect(describeRule({ kind: 'weekly', days: [0, 1, 3] })).toBe('周一、周三、周日');
+  });
+  it('法定工作日 / 休息日 / 间隔', () => {
+    expect(describeRule({ kind: 'cn-workday' })).toBe('法定工作日');
+    expect(describeRule({ kind: 'cn-offday' })).toBe('法定休息日');
+    expect(describeRule({ kind: 'interval', everyDays: 3, anchorDate: today })).toBe('每3天');
+  });
+});
 
-    it('should return date for non-repeating alarm with date', () => {
-      const alarm: Alarm = {
-        id: '1',
-        time: '08:00',
-        date: '2026-02-05',
-        label: 'Test',
-        enabled: true,
-        repeatType: 'none',
-        soundId: 'default',
-        soundName: '系统默认铃声',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      expect(getRepeatDescription(alarm)).toBe('2026-02-05');
-    });
+describe('describePeriod', () => {
+  const today = '2026-11-18';
+  it('各种组合', () => {
+    const rule = { kind: 'cn-workday' } as const;
+    expect(describePeriod({ rule }, today)).toBeNull();
+    expect(describePeriod({ rule, startDate: '2026-12-01', endDate: '2027-01-31' }, today)).toBe(
+      '12月1日 至 2027年1月31日',
+    );
+    expect(describePeriod({ rule, startDate: '2026-12-01' }, today)).toBe('12月1日 起');
+    expect(describePeriod({ rule, endDate: '2026-12-31' }, today)).toBe('至 12月31日');
+    expect(describePeriod({ rule: { kind: 'once', date: today }, startDate: today }, today)).toBeNull();
+  });
+});
 
-    it('should return "每天" for all weekdays', () => {
-      const alarm: Alarm = {
-        id: '1',
-        time: '08:00',
-        label: 'Test',
-        enabled: true,
-        repeatType: 'weekly',
-        repeatDays: [0, 1, 2, 3, 4, 5, 6],
-        soundId: 'default',
-        soundName: '系统默认铃声',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      expect(getRepeatDescription(alarm)).toBe('每天');
-    });
+describe('nextDateForTime / createDefaultAlarm', () => {
+  it('今天还没到就是今天，否则明天', () => {
+    const now = new Date(2026, 10, 18, 7, 30);
+    expect(nextDateForTime('08:00', now)).toBe('2026-11-18');
+    expect(nextDateForTime('07:30', now)).toBe('2026-11-19');
+    expect(nextDateForTime('06:00', now)).toBe('2026-11-19');
+  });
+  it('默认闹钟是下一个整点的单次闹钟', () => {
+    const a = createDefaultAlarm(new Date(2026, 10, 18, 23, 20));
+    expect(a.time).toBe('00:00');
+    expect(a.rule).toEqual({ kind: 'once', date: '2026-11-19' });
+    expect(a.enabled).toBe(true);
+  });
+});
 
-    it('should return "工作日" for weekdays only', () => {
-      const alarm: Alarm = {
-        id: '1',
-        time: '08:00',
-        label: 'Test',
-        enabled: true,
-        repeatType: 'weekly',
-        repeatDays: [1, 2, 3, 4, 5],
-        soundId: 'default',
-        soundName: '系统默认铃声',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      expect(getRepeatDescription(alarm)).toBe('工作日');
-    });
-
-    it('should return "周末" for weekend only', () => {
-      const alarm: Alarm = {
-        id: '1',
-        time: '08:00',
-        label: 'Test',
-        enabled: true,
-        repeatType: 'weekly',
-        repeatDays: [0, 6],
-        soundId: 'default',
-        soundName: '系统默认铃声',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      expect(getRepeatDescription(alarm)).toBe('周末');
-    });
-
-    it('should return specific days for custom weekly repeat', () => {
-      const alarm: Alarm = {
-        id: '1',
-        time: '08:00',
-        label: 'Test',
-        enabled: true,
-        repeatType: 'weekly',
-        repeatDays: [1, 3, 5],
-        soundId: 'default',
-        soundName: '系统默认铃声',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      expect(getRepeatDescription(alarm)).toBe('周一、周三、周五');
-    });
-
-    it('should return holiday description', () => {
-      const alarm: Alarm = {
-        id: '1',
-        time: '08:00',
-        label: 'Test',
-        enabled: true,
-        repeatType: 'holiday',
-        holidayType: 'all',
-        soundId: 'default',
-        soundName: '系统默认铃声',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      expect(getRepeatDescription(alarm)).toBe('所有法定节假日');
+describe('parseRule', () => {
+  it('解析合法规则', () => {
+    expect(parseRule('{"kind":"cn-workday"}')).toEqual({ kind: 'cn-workday' });
+    expect(parseRule({ kind: 'weekly', days: [3, 1, 3, 9] })).toEqual({ kind: 'weekly', days: [1, 3] });
+    expect(parseRule({ kind: 'once', date: '2027-02-01', extra: 1 })).toEqual({ kind: 'once', date: '2027-02-01' });
+    expect(parseRule({ kind: 'interval', everyDays: 2, anchorDate: '2026-11-18' })).toEqual({
+      kind: 'interval',
+      everyDays: 2,
+      anchorDate: '2026-11-18',
     });
   });
-
-  describe('formatTime', () => {
-    it('should format time correctly', () => {
-      const result = formatTime('08:30');
-      expect(result.hour).toBe('08');
-      expect(result.minute).toBe('30');
-    });
-
-    it('should handle midnight', () => {
-      const result = formatTime('00:00');
-      expect(result.hour).toBe('00');
-      expect(result.minute).toBe('00');
-    });
-
-    it('should handle noon', () => {
-      const result = formatTime('12:00');
-      expect(result.hour).toBe('12');
-      expect(result.minute).toBe('00');
-    });
-  });
-
-  describe('createDefaultAlarm', () => {
-    it('should create default alarm with next hour', () => {
-      const alarm = createDefaultAlarm();
-      expect(alarm.time).toMatch(/^\d{2}:\d{2}$/);
-      expect(alarm.label).toBe('');
-      expect(alarm.enabled).toBe(true);
-      expect(alarm.repeatType).toBe('none');
-      expect(alarm.soundId).toBe('default');
-      expect(alarm.soundName).toBe('系统默认铃声');
-    });
-
-    it('should have valid time format', () => {
-      const alarm = createDefaultAlarm();
-      const [hour, minute] = alarm.time.split(':').map(Number);
-      expect(hour).toBeGreaterThanOrEqual(0);
-      expect(hour).toBeLessThan(24);
-      expect(minute).toBeGreaterThanOrEqual(0);
-      expect(minute).toBeLessThan(60);
-    });
+  it('非法规则返回 null', () => {
+    expect(parseRule('not json')).toBeNull();
+    expect(parseRule({ kind: 'weekly', days: [] })).toBeNull();
+    expect(parseRule({ kind: 'once', date: '2026-02-30' })).toBeNull();
+    expect(parseRule({ kind: 'interval', everyDays: 0, anchorDate: '2026-11-18' })).toBeNull();
+    expect(parseRule({ kind: 'unknown' })).toBeNull();
+    expect(parseRule(null)).toBeNull();
   });
 });

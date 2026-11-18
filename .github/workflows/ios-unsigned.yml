@@ -1,0 +1,62 @@
+# 在 GitHub 提供的 macOS 机器上构建未签名的 iOS 安装包（.ipa）
+# 本地无需 Mac / Xcode：下载产物后在 Windows 上用 Sideloadly 等工具以个人 Apple ID 签名安装
+name: Build iOS (unsigned IPA)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check & unit tests
+        run: |
+          pnpm check
+          pnpm test
+
+      - name: Generate native iOS project
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Build (Release, no code signing)
+        run: |
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          echo "Workspace: $WORKSPACE, scheme: $SCHEME"
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            archive | tail -n 50
+
+      - name: Package IPA
+        run: |
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$RUNNER_TEMP"/App.xcarchive/Products/Applications/*.app "$RUNNER_TEMP/Payload/"
+          cd "$RUNNER_TEMP"
+          zip -qry calendar-clock-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: calendar-clock-unsigned-ipa
+          path: ${{ runner.temp }}/calendar-clock-unsigned.ipa
+          retention-days: 30
