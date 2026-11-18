@@ -1,58 +1,26 @@
-// Load environment variables with proper priority (system > .env)
-import "./scripts/load-env.js";
 import type { ExpoConfig } from "expo/config";
 
-// Bundle ID format: space.manus.<project_name_dots>.<timestamp>
-// e.g., "my-app" created at 2024-01-15 10:30:45 -> "space.manus.my.app.t20240115103045"
-// Bundle ID can only contain letters, numbers, and dots
-// Android requires each dot-separated segment to start with a letter
-const rawBundleId = "space.manus.ios.alarm.app.t20260204010751";
-const bundleId =
-  rawBundleId
-    .replace(/[-_]/g, ".") // Replace hyphens/underscores with dots
-    .replace(/[^a-zA-Z0-9.]/g, "") // Remove invalid chars
-    .replace(/\.+/g, ".") // Collapse consecutive dots
-    .replace(/^\.+|\.+$/g, "") // Trim leading/trailing dots
-    .toLowerCase()
-    .split(".")
-    .map((segment) => {
-      // Android requires each segment to start with a letter
-      // Prefix with 'x' if segment starts with a digit
-      return /^[a-zA-Z]/.test(segment) ? segment : "x" + segment;
-    })
-    .join(".") || "space.manus.app";
-// Extract timestamp from bundle ID and prefix with "manus" for deep link scheme
-// e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
-const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
-const schemeFromBundleId = `manus${timestamp}`;
-
-const env = {
-  // App branding - update these values directly (do not use env vars)
-  appName: "智能闹钟",
-  appSlug: "ios-alarm-app",
-  // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
-  // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "https://private-us-east-1.manuscdn.com/sessionFile/vSk8D2TvcZDBFxo6NoNTw6/sandbox/LzraLhfZj1vys8azssL4wc-img-1_1770189754000_na1fn_YWxhcm0taWNvbi12Mw.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvdlNrOEQyVHZjWkRCRnhvNk5vTlR3Ni9zYW5kYm94L0x6cmFMaGZaajF2eXM4YXpzc0w0d2MtaW1nLTFfMTc3MDE4OTc1NDAwMF9uYTFmbl9ZV3hoY20wdGFXTnZiaTEyTXcucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=U8mxTf2Fd2RccL9upyRAyEJZKrOd6MU4tJ~LutzszcexrG-jK1KQcKysPT1KLk-0Zz-2MRi47YTo-5OiR4HKpwx6aelPJ4QBtZ1A9UR-KTfICrj7sXNbkdBkBuF2cCijEGZcp76r~B~P8Tg5W0uF348nZIFY2J2E3iugafOMxOMuytah9GgOsX9Om3rNYAOhSlhRgJ5IrNpbLKGUvSLnup-9g-3Dss00FQtSZ4LShMK3QKkBzOHHy3ESnel942oWZjdO0gK60Uf~PoyzZ5sV4rqdbpOmCUbk-IKUdpLDFP4bkBu3XwpOwvAQMlK-DyfxZxohD8-sB9euyLuiqZ1FDA__",
-  scheme: schemeFromBundleId,
-  iosBundleId: bundleId,
-  androidPackage: bundleId,
-};
+/**
+ * 应用标识。iOS 侧载/签名时 Bundle ID 必须唯一，
+ * 如与他人冲突可通过环境变量 APP_BUNDLE_ID 覆盖。
+ */
+const bundleId = process.env.APP_BUNDLE_ID ?? "com.cwjxfh.calendarclock";
 
 const config: ExpoConfig = {
-  name: env.appName,
-  slug: env.appSlug,
+  name: "日历闹钟",
+  slug: "calendar-clock",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: env.scheme,
+  scheme: "calendarclock",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {
-    supportsTablet: true,
-    bundleIdentifier: env.iosBundleId,
-    "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+    supportsTablet: false,
+    bundleIdentifier: bundleId,
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+    },
   },
   android: {
     adaptiveIcon: {
@@ -63,21 +31,9 @@ const config: ExpoConfig = {
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
-    package: env.androidPackage,
-    permissions: ["POST_NOTIFICATIONS"],
-    intentFilters: [
-      {
-        action: "VIEW",
-        autoVerify: true,
-        data: [
-          {
-            scheme: env.scheme,
-            host: "*",
-          },
-        ],
-        category: ["BROWSABLE", "DEFAULT"],
-      },
-    ],
+    package: bundleId,
+    // SCHEDULE_EXACT_ALARM：Android 12+ 上让定时通知准点触发；RECEIVE_BOOT_COMPLETED：重启后恢复已排程通知
+    permissions: ["POST_NOTIFICATIONS", "SCHEDULE_EXACT_ALARM", "RECEIVE_BOOT_COMPLETED"],
   },
   web: {
     bundler: "metro",
@@ -86,19 +42,8 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
-    [
-      "expo-audio",
-      {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
-      },
-    ],
-    [
-      "expo-video",
-      {
-        supportsBackgroundPlayback: true,
-        supportsPictureInPicture: true,
-      },
-    ],
+    "expo-sqlite",
+    "expo-notifications",
     [
       "expo-splash-screen",
       {
@@ -124,6 +69,10 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
+  },
+  extra: {
+    // 运行 `npx eas init` 后会自动写入 projectId，也可以手动填写
+    eas: process.env.EAS_PROJECT_ID ? { projectId: process.env.EAS_PROJECT_ID } : undefined,
   },
 };
 

@@ -1,14 +1,14 @@
 /**
- * 通知服务
- * 管理闹钟通知的调度和取消
+ * 通知服务：把排程引擎算出的计划（SchedulePlan）落到系统本地通知
+ *
+ * 本 App 独占所有本地通知，每次同步都“全部取消再按计划重建”，简单且不会残留。
  */
 
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import type { Alarm } from '@/types/alarm';
-import { getHolidayDates } from '@/constants/holidays';
+import type { SchedulePlan } from '@/lib/schedule';
 
-// 配置通知行为
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -20,228 +20,115 @@ Notifications.setNotificationHandler({
 });
 
 /**
- * 请求通知权限
+ * 可同时挂起的通知数量上限
+ * - iOS 系统硬限制 64，留 4 个余量
+ * - Android 没有同样的硬限制，但过多会拖慢重排，取一个足够覆盖较长时间的值
  */
+export const NOTIFICATION_BUDGET = Platform.select({ ios: 60, android: 200, default: 60 }) ?? 60;
+
+export const isNotificationSupported = Platform.OS === 'ios' || Platform.OS === 'android';
+
+const ANDROID_CHANNEL_ID = 'alarm-default-channel';
+const REFRESH_REMINDER_ID = 'schedule-refresh-reminder';
+
 export async function requestNotificationPermissions(): Promise<boolean> {
-  if (Platform.OS === 'web') {
-    return true; // Web平台不需要权限
-  }
-
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  return finalStatus === 'granted';
+  if (!isNotificationSupported) return false;
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  if (existing === 'granted') return true;
+  const { status } = await Notifications.requestPermissionsAsync({
+    ios: { allowAlert: true, allowSound: true, allowBadge: false },
+  });
+  return status === 'granted';
 }
 
-/**
- * 获取通知铃声配置
- * 系统铃声统一跟随设备默认提醒音
- */
-function getNotificationSound(soundId: string | undefined): string {
-  if (!soundId || soundId === 'default') return 'default';
-
-  if (soundId.includes('/') || soundId.includes('.')) {
-    const fileName = soundId.split('/').pop();
-    if (fileName && fileName.includes('.')) {
-      return fileName;
-    }
-  }
-
-  // 旧版本里的系统预设ID（classic/gentle等）统一映射到系统默认提醒音
-  return 'default';
-}
-
-/**
- * Android 需要创建通知渠道以确保高优先级提醒
- */
-async function ensureAndroidAlarmChannel(): Promise<string | undefined> {
-  if (Platform.OS !== 'android') {
-    return undefined;
-  }
-
-  const channelId = 'alarm-default-channel';
-  await Notifications.setNotificationChannelAsync(channelId, {
+async function ensureAndroidChannel(): Promise<string | undefined> {
+  if (Platform.OS !== 'android') return undefined;
+  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
     name: '闹钟提醒',
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     bypassDnd: true,
+    sound: 'default',
   });
-  return channelId;
+  return ANDROID_CHANNEL_ID;
 }
 
 /**
- * 为闹钟调度通知
+ * 铃声：目前统一使用系统默认提示音。
+ * 如需自定义，需要把音频文件通过 expo-notifications 插件打包进 App，再在这里返回文件名。
  */
-export async function scheduleAlarmNotification(alarm: Alarm): Promise<string[]> {
-  if (Platform.OS === 'web') {
-    console.log('Web platform does not support notifications');
-    return [];
-  }
+function notificationSound(_alarm: Alarm): string {
+  return 'default';
+}
 
-  // 先取消已有的通知
-  await cancelAlarmNotification(alarm.id);
+function buildContent(alarm: Alarm): Notifications.NotificationContentInput {
+  return {
+    title: alarm.label || '闹钟',
+    body: alarm.label ? alarm.time : `${alarm.time} 闹钟时间到了`,
+    sound: notificationSound(alarm),
+    priority: Notifications.AndroidNotificationPriority.MAX,
+    vibrate: [0, 250, 250, 250],
+    // 时效性通知：可突破“专注模式”的通知摘要（需在系统设置中允许）
+    interruptionLevel: 'timeSensitive',
+    data: { alarmId: alarm.id },
+  };
+}
 
-  const notificationIds: string[] = [];
+export interface ApplyResult {
+  scheduled: number;
+}
 
-  try {
-    const [hour, minute] = alarm.time.split(':').map(Number);
-    const sound = getNotificationSound(alarm.soundId);
-    const channelId = await ensureAndroidAlarmChannel();
+/**
+ * 按计划重建全部本地通知
+ */
+export async function applySchedulePlan(plan: SchedulePlan, alarms: Alarm[]): Promise<ApplyResult> {
+  if (!isNotificationSupported) return { scheduled: 0 };
 
-    const content: Notifications.NotificationContentInput = {
-      title: alarm.label || '闹钟',
-      body: `${alarm.time}`,
-      sound,
-      priority: Notifications.AndroidNotificationPriority.MAX,
-      vibrate: [0, 250, 250, 250],
-      data: { alarmId: alarm.id },
-    };
+  await Notifications.cancelAllScheduledNotificationsAsync();
+  const channelId = await ensureAndroidChannel();
+  const byId = new Map(alarms.map((a) => [a.id, a]));
 
-    // 不重复的闹钟
-    if (alarm.repeatType === 'none') {
-      let triggerDate = new Date();
-      triggerDate.setHours(hour, minute, 0, 0);
-
-      // 如果指定了日期
-      if (alarm.date) {
-        const [year, month, day] = alarm.date.split('-').map(Number);
-        triggerDate = new Date(year, month - 1, day, hour, minute, 0, 0);
-      } else {
-        // 如果时间已过,设置为明天
-        if (triggerDate <= new Date()) {
-          triggerDate.setDate(triggerDate.getDate() + 1);
-        }
-      }
-
-      const id = await Notifications.scheduleNotificationAsync({
-        content,
+  let scheduled = 0;
+  for (const item of plan.items) {
+    const alarm = byId.get(item.alarmId);
+    if (!alarm) continue;
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: `alarm:${alarm.id}:${item.date.getTime()}`,
+        content: buildContent(alarm),
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: triggerDate,
+          date: item.date,
           ...(channelId ? { channelId } : {}),
         },
       });
-
-      notificationIds.push(id);
+      scheduled++;
+    } catch (error) {
+      console.error('Failed to schedule notification:', error);
     }
+  }
 
-    // 每周重复的闹钟
-    else if (alarm.repeatType === 'weekly' && alarm.repeatDays && alarm.repeatDays.length > 0) {
-      for (const weekday of alarm.repeatDays) {
-        const id = await Notifications.scheduleNotificationAsync({
-          content,
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-            hour,
-            minute,
-            weekday: weekday + 1, // expo-notifications uses 1-7 (Sunday=1)
-            repeats: true,
-            ...(channelId ? { channelId } : {}),
-          },
-        });
-
-        notificationIds.push(id);
-      }
+  if (plan.refreshReminderAt) {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: REFRESH_REMINDER_ID,
+        content: {
+          title: '请打开一次闹钟 App',
+          body: '受系统通知数量限制，后续闹钟需要打开 App 才能继续安排。',
+          sound: 'default',
+          data: { type: 'refresh-reminder' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: plan.refreshReminderAt,
+          ...(channelId ? { channelId } : {}),
+        },
+      });
+    } catch (error) {
+      console.error('Failed to schedule refresh reminder:', error);
     }
-
-    // 法定节假日闹钟
-    else if (alarm.repeatType === 'holiday') {
-      const now = new Date();
-      const startYear = now.getFullYear();
-      const endYear = now.getFullYear() + 1;
-      const holidayDates = getHolidayDates(startYear, endYear);
-
-      for (const dateStr of holidayDates) {
-        const [year, month, day] = dateStr.split('-').map(Number);
-        const triggerDate = new Date(year, month - 1, day, hour, minute, 0, 0);
-        if (triggerDate > now) {
-          const id = await Notifications.scheduleNotificationAsync({
-            content,
-            trigger: {
-              type: Notifications.SchedulableTriggerInputTypes.DATE,
-              date: triggerDate,
-              ...(channelId ? { channelId } : {}),
-            },
-          });
-          notificationIds.push(id);
-        }
-      }
-    }
-
-    // 保存通知ID到闹钟数据(用于后续取消)
-    // 这里简化处理,实际应该保存到storage
-    console.log(`Scheduled ${notificationIds.length} notifications for alarm ${alarm.id}`);
-
-    return notificationIds;
-  } catch (error) {
-    console.error('Failed to schedule notification:', error);
-    return [];
-  }
-}
-
-/**
- * 取消闹钟的所有通知
- */
-export async function cancelAlarmNotification(alarmId: string): Promise<void> {
-  if (Platform.OS === 'web') {
-    return;
   }
 
-  try {
-    // 获取所有已调度的通知
-    const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-
-    // 找到属于该闹钟的通知
-    const alarmNotifications = scheduledNotifications.filter(
-      notification => notification.content.data?.alarmId === alarmId
-    );
-
-    // 取消这些通知
-    for (const notification of alarmNotifications) {
-      await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-    }
-
-    console.log(`Cancelled ${alarmNotifications.length} notifications for alarm ${alarmId}`);
-  } catch (error) {
-    console.error('Failed to cancel notification:', error);
-  }
-}
-
-/**
- * 取消所有通知
- */
-export async function cancelAllNotifications(): Promise<void> {
-  if (Platform.OS === 'web') {
-    return;
-  }
-
-  try {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    console.log('Cancelled all notifications');
-  } catch (error) {
-    console.error('Failed to cancel all notifications:', error);
-  }
-}
-
-/**
- * 获取已调度的通知数量
- */
-export async function getScheduledNotificationCount(): Promise<number> {
-  if (Platform.OS === 'web') {
-    return 0;
-  }
-
-  try {
-    const notifications = await Notifications.getAllScheduledNotificationsAsync();
-    return notifications.length;
-  } catch (error) {
-    console.error('Failed to get notification count:', error);
-    return 0;
-  }
+  return { scheduled };
 }
