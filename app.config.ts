@@ -35,7 +35,8 @@ const config: ExpoConfig = {
   },
   web: {
     bundler: "metro",
-    output: "static",
+    // Web 仅用于开发调试界面，用单页模式即可；static 模式的服务端预渲染在热更新后容易报 "unknown module"
+    output: "single",
     favicon: "./assets/images/favicon.png",
   },
   plugins: [

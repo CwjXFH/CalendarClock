@@ -17,6 +17,7 @@ const MAPPING = {
   "alarm": "alarm",
   "alarm.fill": "alarm",
   "gearshape.fill": "settings",
+  "calendar": "calendar-today",
 } satisfies Record<string, ComponentProps<typeof MaterialIcons>["name"]>;
 
 /**
