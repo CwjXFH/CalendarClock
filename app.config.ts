@@ -14,7 +14,6 @@ const config: ExpoConfig = {
   icon: "./assets/images/icon.png",
   scheme: "calendarclock",
   userInterfaceStyle: "automatic",
-  newArchEnabled: true,
   ios: {
     supportsTablet: false,
     bundleIdentifier: bundleId,
@@ -29,7 +28,6 @@ const config: ExpoConfig = {
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: bundleId,
     // SCHEDULE_EXACT_ALARM：Android 12+ 上让定时通知准点触发；RECEIVE_BOOT_COMPLETED：重启后恢复已排程通知
