@@ -41,6 +41,8 @@ export function SiteView({ url }: SiteViewProps) {
         style={{ flex: 1, backgroundColor: colors.background }}
         onLoadEnd={() => setLoading(false)}
         onError={() => setFailed(true)}
+        // onError 只覆盖网络层错误，HTTP 4xx/5xx 需单独处理（仅主页面，子资源出错不影响）
+        onHttpError={() => setFailed(true)}
         allowsBackForwardNavigationGestures
         pullToRefreshEnabled
         setSupportMultipleWindows={false}

@@ -33,7 +33,24 @@ export function DateField({ label, value, onChange, placeholder = '不限', clea
       <View className="mb-3">
         <View className="bg-surface border border-border rounded-xl px-4 py-3 flex-row items-center justify-between">
           <Text className="text-base text-foreground">{label}</Text>
-          <WebInput type="date" value={value ?? ''} min={minimumDate} onChange={(v) => onChange(v || undefined)} />
+          <View className="flex-row items-center gap-3">
+            {!value && <Text className="text-base text-muted">{placeholder}</Text>}
+            <WebInput
+              type="date"
+              value={value ?? ''}
+              min={minimumDate}
+              onChange={(v) => {
+                // HTML 的 min 拦不住手动输入，这里再校验一次（YYYY-MM-DD 可直接按字符串比较）
+                if (v && minimumDate && v < minimumDate) return;
+                onChange(v || undefined);
+              }}
+            />
+            {clearable && value && (
+              <Pressable onPress={() => onChange(undefined)} hitSlop={8}>
+                <Text className="text-sm text-muted">清除</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       </View>
     );
