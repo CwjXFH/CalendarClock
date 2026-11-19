@@ -1,6 +1,7 @@
 /**
  * 日期 / 时间选择字段
  * iOS：点击展开内嵌选择器；Android：弹出系统对话框
+ * Web：datetimepicker 不支持 Web，改用浏览器原生 <input type="date|time">（仅用于开发调试界面）
  */
 
 import React, { useState } from 'react';
@@ -26,6 +27,34 @@ export function DateField({ label, value, onChange, placeholder = '不限', clea
     if (event.type === 'dismissed' || !selected) return;
     onChange(toDateKey(selected));
   };
+
+  if (Platform.OS === 'web') {
+    return (
+      <View className="mb-3">
+        <View className="bg-surface border border-border rounded-xl px-4 py-3 flex-row items-center justify-between">
+          <Text className="text-base text-foreground">{label}</Text>
+          <View className="flex-row items-center gap-3">
+            {!value && <Text className="text-base text-muted">{placeholder}</Text>}
+            <WebInput
+              type="date"
+              value={value ?? ''}
+              min={minimumDate}
+              onChange={(v) => {
+                // HTML 的 min 拦不住手动输入，这里再校验一次（YYYY-MM-DD 可直接按字符串比较）
+                if (v && minimumDate && v < minimumDate) return;
+                onChange(v || undefined);
+              }}
+            />
+            {clearable && value && (
+              <Pressable onPress={() => onChange(undefined)} hitSlop={8}>
+                <Text className="text-sm text-muted">清除</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   const display = value ? `${formatFullDate(value)} ${WEEKDAY_NAMES[parseDateKey(value).getDay()]}` : placeholder;
 
@@ -81,6 +110,14 @@ export function TimeField({ value, onChange }: TimeFieldProps) {
     onChange(`${String(selected.getHours()).padStart(2, '0')}:${String(selected.getMinutes()).padStart(2, '0')}`);
   };
 
+  if (Platform.OS === 'web') {
+    return (
+      <View className="items-center py-6 bg-surface">
+        <WebInput type="time" value={value} onChange={(v) => v && onChange(v)} large />
+      </View>
+    );
+  }
+
   return (
     <View className="items-center py-6 bg-surface">
       {Platform.OS !== 'ios' && (
@@ -101,4 +138,32 @@ export function TimeField({ value, onChange }: TimeFieldProps) {
       )}
     </View>
   );
+}
+
+interface WebInputProps {
+  type: 'date' | 'time';
+  value: string;
+  onChange: (value: string) => void;
+  min?: string;
+  large?: boolean;
+}
+
+/** Web 端原生输入框：react-native-web 允许直接渲染 DOM 元素 */
+function WebInput({ type, value, onChange, min, large }: WebInputProps) {
+  return React.createElement('input', {
+    type,
+    value,
+    min,
+    onChange: (e: { target: { value: string } }) => onChange(e.target.value),
+    style: {
+      fontSize: large ? 56 : 16,
+      fontWeight: large ? 700 : 400,
+      color: large ? 'inherit' : '#FF9500',
+      background: 'transparent',
+      border: 'none',
+      outline: 'none',
+      fontFamily: 'inherit',
+      textAlign: large ? 'center' : 'right',
+    },
+  });
 }
