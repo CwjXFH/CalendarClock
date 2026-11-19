@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, Text, Pressable, Platform } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import * as Haptics from 'expo-haptics';
 import { AlarmCard } from '@/components/alarm-card';
 import type { Alarm } from '@/types/alarm';

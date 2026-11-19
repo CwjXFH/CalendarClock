@@ -87,14 +87,24 @@ pnpm build:ios            # 云端构建，过程中按提示登录 Apple 账号
 
 ## 开发
 
-需要 Node.js 22.13+（单元测试使用内置的 `node:sqlite`）和 pnpm 9。
+需要 Node.js 22.13+（单元测试使用内置的 `node:sqlite`）和 pnpm 9（没装 pnpm 可以用 `npx pnpm@9.12.0` 代替）。项目基于 Expo SDK 58。
 
 ```bash
 pnpm install
-pnpm start    # 启动开发服务器，可用 Expo Go 扫码在 iPhone 上调试
+pnpm start    # 启动开发服务器
 pnpm test     # 单元测试：排程、节假日、数据库读写
 pnpm check    # TypeScript 类型检查
 ```
+
+### 用 Expo Go 在 iPhone 上预览（无需签名、无需开发者账号）
+
+1. iPhone 在 App Store 安装 **Expo Go**（需支持 SDK 58，即最新版）。
+2. 电脑与手机连同一个 Wi-Fi，电脑上运行 `pnpm start`（电脑有多个网卡时可指定局域网地址：`REACT_NATIVE_PACKAGER_HOSTNAME=192.168.x.x pnpm start`）。
+3. 用 iPhone 相机扫描终端里的二维码，或在 Expo Go 中手动输入 `exp://<电脑局域网IP>:8081`。
+
+连不上时：检查 Windows 防火墙是否放行了 Node.js（专用网络），路由器是否开启了“AP 隔离”；公司网络可改用 `pnpm start --tunnel`。
+
+Expo Go 只用于预览：App 运行在 Expo Go 内部，每次打开都需要电脑上的开发服务器。闹钟、节假日、SQLite、本地通知都可以正常测试。
 
 目录结构：
 
